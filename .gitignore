@@ -1,0 +1,23 @@
+# docs are managed manually,not auto-committed
+docs/
+
+# Nested independent repos with their own remotes
+BBS_Crawler/
+BBS_Database/
+
+# Node
+node_modules/
+dist/
+*.log
+.env
+.env.local
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local config / data
+bbs-mcp.config.json
+logs/
