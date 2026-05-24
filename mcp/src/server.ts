@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { loadFromEnv, ConfigError } from './config/load.js';
 import { initLogger, getLogger } from './runtime/logger.js';
 import { registerTools } from './tools/index.js';
+import { openReaders } from './runtime/sqlite-readers.js';
 
 async function main(): Promise<void> {
   let config;
@@ -18,13 +19,15 @@ async function main(): Promise<void> {
   const log = getLogger();
   log.info({ data_dir: config.data_dir, site: config.crawler.site_key }, 'bbs-mcp starting');
 
+  const readers = openReaders(config.data_dir);
+
   const server = new McpServer({
     name: 'bbs-mcp',
     version: '0.0.0',
   });
 
   // M0: graph 永远 disabled。M4 计划再启用
-  registerTools(server, { config, graphEnabled: false });
+  registerTools(server, { config, graphEnabled: false, readers });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
