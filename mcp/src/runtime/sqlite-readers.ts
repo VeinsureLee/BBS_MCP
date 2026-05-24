@@ -149,7 +149,7 @@ export function openReaders(data_dir: string): Readers {
   return {
     listSites() {
       return sdb
-        .prepare<unknown[], SiteRow>(`SELECT site_key, name, base_url FROM sites`)
+        .prepare<unknown[], SiteRow>(`SELECT site_key, display_name AS name, base_url FROM sites`)
         .all() as SiteRow[];
     },
 
@@ -332,7 +332,7 @@ export function openReaders(data_dir: string): Readers {
 
     buildForumTree() {
       const sites = sdb.prepare<unknown[], any>(
-        `SELECT site_key, name, base_url FROM sites`,
+        `SELECT site_key, display_name AS name, base_url FROM sites`,
       ).all();
       const allNodes = sdb.prepare<unknown[], any>(
         `SELECT id, site_key, node_key, name, parent_id, type, last_crawled_at, db_path FROM nodes ORDER BY id`,

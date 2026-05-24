@@ -14,27 +14,34 @@ export function buildFixture(root: string): void {
   rmSync(root, { recursive: true, force: true });
   mkdirSync(join(root, 'forums'), { recursive: true });
 
-  // structure.db
+  // structure.db — schema must match BBS_Crawler/src/repository/db.ts exactly.
+  // NOTE: sites uses `display_name` (NOT `name`); readers alias it back.
   const sdb = new Database(join(root, 'structure.db'));
   sdb.exec(`
     CREATE TABLE sites (
-      site_key TEXT PRIMARY KEY, name TEXT, base_url TEXT
+      site_key     TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      base_url     TEXT NOT NULL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE nodes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      site_key TEXT NOT NULL,
-      node_key TEXT NOT NULL,
-      name TEXT NOT NULL,
-      parent_id INTEGER,
-      type TEXT NOT NULL,
-      level INTEGER NOT NULL,
-      full_path TEXT,
-      db_path TEXT,
-      moderators TEXT,
-      last_crawled_at TEXT
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id       INTEGER REFERENCES nodes(id) ON DELETE CASCADE,
+      site_key        TEXT NOT NULL REFERENCES sites(site_key) ON DELETE CASCADE,
+      node_key        TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      type            TEXT NOT NULL CHECK (type IN ('forum','sub_forum','board')),
+      level           INTEGER NOT NULL,
+      full_path       TEXT,
+      db_path         TEXT,
+      moderators      TEXT,
+      raw             TEXT,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      last_crawled_at TEXT,
+      UNIQUE (site_key, node_key)
     );
   `);
-  sdb.prepare(`INSERT INTO sites (site_key, name, base_url) VALUES (?, ?, ?)`)
+  sdb.prepare(`INSERT INTO sites (site_key, display_name, base_url) VALUES (?, ?, ?)`)
     .run('school-bbs', 'Test School BBS', 'https://example.edu/bbs');
   sdb.prepare(`INSERT INTO nodes (site_key, node_key, name, parent_id, type, level, full_path, db_path, last_crawled_at) VALUES (?,?,?,?,?,?,?,?,?)`)
     .run('school-bbs', 'forum-life', '生活', null, 'forum', 1, 'forum-life', null, null);
