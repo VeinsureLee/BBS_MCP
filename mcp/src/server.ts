@@ -4,6 +4,7 @@ import { loadFromEnv, ConfigError } from './config/load.js';
 import { initLogger, getLogger } from './runtime/logger.js';
 import { registerTools } from './tools/index.js';
 import { openReaders } from './runtime/sqlite-readers.js';
+import { buildForumTree, forumTreeUri } from './resources/forum-tree.js';
 
 async function main(): Promise<void> {
   let config;
@@ -28,6 +29,22 @@ async function main(): Promise<void> {
 
   // M0: graph 永远 disabled。M4 计划再启用
   registerTools(server, { config, graphEnabled: false, readers });
+
+  // M1: forum-tree resource
+  server.resource(
+    'forum-tree',
+    forumTreeUri,
+    async (_uri) => ({
+      contents: [
+        {
+          uri: forumTreeUri,
+          mimeType: 'application/json',
+          text: JSON.stringify(buildForumTree(readers)),
+        },
+      ],
+    }),
+  );
+  log.info('forum-tree resource registered');
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

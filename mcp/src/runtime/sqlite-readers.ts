@@ -57,6 +57,19 @@ export interface Readers {
   getThreadById(forum_db: string, thread_id: number): { thread: ThreadRow; posts: PostRow[] } | null;
   searchTitles(query: string, opts: { board_node_id?: number; limit: number }): { threads: ThreadRow[] };
   resolveDbPath(relative_or_abs: string): string;
+  buildForumTree(): {
+    built_at: string;
+    sites: {
+      site_key: string; name: string; base_url: string;
+      children: {
+        kind: 'forum' | 'sub_forum' | 'board';
+        node_id: number; node_key: string; name: string;
+        pinned_count?: number; plain_count?: number;
+        last_crawled_at?: string | null;
+        children: any[];
+      }[];
+    }[];
+  };
   close(): void;
 }
 
@@ -315,6 +328,57 @@ export function openReaders(data_dir: string): Readers {
 
     resolveDbPath(p) {
       return isAbsolute(p) ? p : join(data_dir, p);
+    },
+
+    buildForumTree() {
+      const sites = sdb.prepare<unknown[], any>(
+        `SELECT site_key, name, base_url FROM sites`,
+      ).all();
+      const allNodes = sdb.prepare<unknown[], any>(
+        `SELECT id, site_key, node_key, name, parent_id, type, last_crawled_at, db_path FROM nodes ORDER BY id`,
+      ).all() as any[];
+
+      function buildChildren(siteKey: string, parentId: number | null): any[] {
+        const kids = allNodes.filter((n) => n.site_key === siteKey && n.parent_id === parentId);
+        return kids.map((n) => {
+          const base: any = {
+            kind: n.type,
+            node_id: n.id,
+            node_key: n.node_key,
+            name: n.name,
+            last_crawled_at: n.last_crawled_at,
+            children: buildChildren(siteKey, n.id),
+          };
+          if (n.type === 'board' && n.db_path) {
+            try {
+              const bdb = openBoardDb(n.db_path);
+              const counts = bdb.prepare<unknown[], { is_pinned: number; cnt: number }>(
+                `SELECT is_pinned, COUNT(*) AS cnt FROM threads GROUP BY is_pinned`,
+              ).all() as { is_pinned: number; cnt: number }[];
+              let pinned = 0, plain = 0;
+              for (const row of counts) {
+                if (row.is_pinned === 1) pinned = row.cnt; else plain = row.cnt;
+              }
+              base.pinned_count = pinned;
+              base.plain_count = plain;
+            } catch {
+              base.pinned_count = 0;
+              base.plain_count = 0;
+            }
+          }
+          return base;
+        });
+      }
+
+      return {
+        built_at: new Date().toISOString(),
+        sites: (sites as any[]).map((s) => ({
+          site_key: s.site_key,
+          name: s.name,
+          base_url: s.base_url,
+          children: buildChildren(s.site_key, null),
+        })),
+      };
     },
 
     close() {
