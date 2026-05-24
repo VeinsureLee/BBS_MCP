@@ -5,7 +5,7 @@
   "workspaces": [
     "BBS_Crawler",
     "BBS_Database",
-    "BBS_MCP"
+    "mcp"
   ],
   "engines": { "node": ">=20" }
 }
