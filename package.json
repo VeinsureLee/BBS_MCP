@@ -1,0 +1,11 @@
+{
+  "name": "bbs-mcp-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "BBS_Crawler",
+    "BBS_Database",
+    "BBS_MCP/BBS_MCP"
+  ],
+  "engines": { "node": ">=20" }
+}
