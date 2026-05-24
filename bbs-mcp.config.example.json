@@ -1,5 +1,5 @@
 {
-  "data_dir": "./BBS_Crawler/.data",
+  "data_dir": "./BBS_Crawler/data/crawler.db",
   "crawler": {
     "site_key": "school-bbs"
   },
