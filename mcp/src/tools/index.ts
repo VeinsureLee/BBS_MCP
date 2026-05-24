@@ -3,6 +3,7 @@ import { pingTool } from './core/ping.js';
 import { listSitesTool } from './core/list-sites.js';
 import { listBoardsTool } from './core/list-boards.js';
 import { threadsByBoardTool } from './core/threads-by-board.js';
+import { getThreadTool } from './core/get-thread.js';
 import type { McpConfig } from '../config/schema.js';
 import { toMcpError } from '../errors.js';
 import { getLogger } from '../runtime/logger.js';
@@ -23,8 +24,9 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
   registerTool(server, listSitesTool, sharedCtx, log);
   registerTool(server, listBoardsTool, sharedCtx, log);
   registerTool(server, threadsByBoardTool, sharedCtx, log);
+  registerTool(server, getThreadTool, sharedCtx, log);
 
-  log.info({ graphEnabled: opts.graphEnabled, registered: 4 }, 'tools registered');
+  log.info({ graphEnabled: opts.graphEnabled, registered: 5 }, 'tools registered');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
