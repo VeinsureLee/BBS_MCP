@@ -4,6 +4,7 @@ import { listSitesTool } from './core/list-sites.js';
 import { listBoardsTool } from './core/list-boards.js';
 import { threadsByBoardTool } from './core/threads-by-board.js';
 import { getThreadTool } from './core/get-thread.js';
+import { searchThreadsTool } from './core/search-threads.js';
 import type { McpConfig } from '../config/schema.js';
 import { toMcpError } from '../errors.js';
 import { getLogger } from '../runtime/logger.js';
@@ -25,8 +26,9 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
   registerTool(server, listBoardsTool, sharedCtx, log);
   registerTool(server, threadsByBoardTool, sharedCtx, log);
   registerTool(server, getThreadTool, sharedCtx, log);
+  registerTool(server, searchThreadsTool, sharedCtx, log);
 
-  log.info({ graphEnabled: opts.graphEnabled, registered: 5 }, 'tools registered');
+  log.info({ graphEnabled: opts.graphEnabled, registered: 6 }, 'tools registered');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
