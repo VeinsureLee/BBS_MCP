@@ -181,8 +181,14 @@ export const realCrawlerFactory: CrawlerFactory = async ({ siteKey, dataDir }) =
       getAdapter: (sk: string) => crawler.getAdapter(sk),
     },
     persistThread: async (sk: string, thread: unknown) => {
-      const result = await (crawler as any).upsertThread(sk, thread);
-      return result?.id ?? 0;
+      // upsertThread requires opts: { isPinned: boolean } and returns
+      // { threadId, boardDb } — NOT { id }. Default isPinned=false here;
+      // pinned vs plain distinction is conveyed by the crawler's own
+      // upsertPinnedThread vs upsertPlainThread paths upstream — when
+      // CrawlerService calls persistThread it has already decided.
+      // Task 18 may refine this if pinned routing is needed at this layer.
+      const result = await (crawler as any).upsertThread(sk, thread, { isPinned: false });
+      return result?.threadId ?? 0;
     },
     appendFetchLog: (row: unknown) => (crawler as any).appendFetchLog(row),
   });
