@@ -1,13 +1,17 @@
-import {
-  BoardNotFoundError,
-  SessionExpiredError,
-  RateLimitedError,
-  FetchFailedError,
-  MissingCredentialsError,
-  LoginFailedError,
-  NavigationTimeoutError,
-  DatabaseError,
-} from 'bbs-crawler';
+/**
+ * MCP-side error_code mapping for crawler-domain errors.
+ *
+ * Decoupled from `bbs-crawler` at the module level: we duck-type on `err.name`
+ * instead of `instanceof CrawlerError`, so loading this module never triggers
+ * resolution of `bbs-crawler`'s compiled output. This unblocks `node dist/server.js`
+ * for M0-M2 (read-only tools that never actually need the crawler at runtime).
+ *
+ * Safe because `bbs-crawler`'s `BaseAppError` sets `this.name = new.target.name`
+ * in its constructor, so every subclass has `.name === 'BoardNotFoundError'` etc.
+ *
+ * Task 17 will revisit this when wiring CrawlerService for real, alongside the
+ * underlying crawler ESM-import fix.
+ */
 
 export type McpErrorCode =
   | 'crawler.login_required'
@@ -20,6 +24,17 @@ export type McpErrorCode =
   | 'mcp.config_error'
   | 'mcp.invalid_input'
   | 'mcp.internal';
+
+const CRAWLER_ERROR_NAME_MAP: Record<string, McpErrorCode> = {
+  BoardNotFoundError: 'crawler.board_not_found',
+  SessionExpiredError: 'crawler.login_required',
+  MissingCredentialsError: 'crawler.login_required',
+  LoginFailedError: 'crawler.login_required',
+  RateLimitedError: 'crawler.rate_limited',
+  NavigationTimeoutError: 'crawler.timeout',
+  FetchFailedError: 'crawler.fetch_failed',
+  DatabaseError: 'crawler.database',
+};
 
 export class McpToolError extends Error {
   constructor(
@@ -35,26 +50,11 @@ export class McpToolError extends Error {
 export function toMcpError(err: unknown): McpToolError {
   if (err instanceof McpToolError) return err;
 
-  const msg = err instanceof Error ? err.message : String(err);
-
-  if (err instanceof BoardNotFoundError) {
-    return new McpToolError('crawler.board_not_found', msg, err);
-  }
-  if (err instanceof SessionExpiredError || err instanceof MissingCredentialsError || err instanceof LoginFailedError) {
-    return new McpToolError('crawler.login_required', msg, err);
-  }
-  if (err instanceof RateLimitedError) {
-    return new McpToolError('crawler.rate_limited', msg, err);
-  }
-  if (err instanceof NavigationTimeoutError) {
-    return new McpToolError('crawler.timeout', msg, err);
-  }
-  if (err instanceof FetchFailedError) {
-    return new McpToolError('crawler.fetch_failed', msg, err);
-  }
-  if (err instanceof DatabaseError) {
-    return new McpToolError('crawler.database', msg, err);
+  if (err instanceof Error) {
+    const code = CRAWLER_ERROR_NAME_MAP[err.name];
+    if (code) return new McpToolError(code, err.message, err);
+    return new McpToolError('mcp.internal', err.message, err);
   }
 
-  return new McpToolError('mcp.internal', msg, err);
+  return new McpToolError('mcp.internal', String(err), err);
 }

@@ -1,25 +1,46 @@
 import { describe, it, expect } from 'vitest';
 import { toMcpError, McpToolError } from '../../src/errors.js';
-import {
-  BoardNotFoundError,
-  SessionExpiredError,
-  RateLimitedError,
-  FetchFailedError,
-} from 'bbs-crawler';
+
+/**
+ * Tests use locally-defined fake error classes that mimic bbs-crawler's
+ * naming convention (`this.name = '<ClassName>'`). This keeps the test
+ * decoupled from bbs-crawler at module level and verifies the public
+ * duck-typing contract of toMcpError directly.
+ */
+class FakeBoardNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BoardNotFoundError';
+  }
+}
+
+class FakeSessionExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SessionExpiredError';
+  }
+}
+
+class FakeRateLimitedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RateLimitedError';
+  }
+}
 
 describe('toMcpError', () => {
   it('maps BoardNotFoundError to crawler.board_not_found', () => {
-    const err = toMcpError(new BoardNotFoundError('xyz'));
+    const err = toMcpError(new FakeBoardNotFoundError('xyz'));
     expect(err.error_code).toBe('crawler.board_not_found');
   });
 
   it('maps SessionExpiredError to crawler.login_required', () => {
-    const err = toMcpError(new SessionExpiredError('expired'));
+    const err = toMcpError(new FakeSessionExpiredError('expired'));
     expect(err.error_code).toBe('crawler.login_required');
   });
 
   it('maps RateLimitedError to crawler.rate_limited', () => {
-    const err = toMcpError(new RateLimitedError('429'));
+    const err = toMcpError(new FakeRateLimitedError('429'));
     expect(err.error_code).toBe('crawler.rate_limited');
   });
 
@@ -33,5 +54,11 @@ describe('toMcpError', () => {
     const err = toMcpError(orig);
     expect(err.message).toContain('boom');
     expect(err.original).toBe(orig);
+  });
+
+  it('returns existing McpToolError unchanged (pass-through)', () => {
+    const existing = new McpToolError('crawler.timeout', 'preset');
+    const err = toMcpError(existing);
+    expect(err).toBe(existing);
   });
 });
