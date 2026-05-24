@@ -6,6 +6,7 @@ import { threadsByBoardTool } from './core/threads-by-board.js';
 import { getThreadTool } from './core/get-thread.js';
 import { searchThreadsTool } from './core/search-threads.js';
 import { crawlTool } from './core/crawl.js';
+import { statusTool } from './core/status.js';
 import type { McpConfig } from '../config/schema.js';
 import { toMcpError } from '../errors.js';
 import { getLogger } from '../runtime/logger.js';
@@ -26,6 +27,7 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
 
   const sharedCtx = { readers: opts.readers, graphEnabled: opts.graphEnabled };
   const crawlCtx = { crawler: opts.crawler, locks: opts.locks };
+  const statusCtx = { readers: opts.readers, crawler: opts.crawler, graphEnabled: opts.graphEnabled };
 
   registerTool(server, pingTool, {}, log);
   registerTool(server, listSitesTool, sharedCtx, log);
@@ -34,8 +36,9 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
   registerTool(server, getThreadTool, sharedCtx, log);
   registerTool(server, searchThreadsTool, sharedCtx, log);
   registerTool(server, crawlTool, crawlCtx, log);
+  registerTool(server, statusTool, statusCtx, log);
 
-  log.info({ graphEnabled: opts.graphEnabled, registered: 7 }, 'tools registered');
+  log.info({ graphEnabled: opts.graphEnabled, registered: 8 }, 'tools registered');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
