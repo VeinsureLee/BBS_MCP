@@ -5,6 +5,8 @@ import { initLogger, getLogger } from './runtime/logger.js';
 import { registerTools } from './tools/index.js';
 import { openReaders } from './runtime/sqlite-readers.js';
 import { buildForumTree, forumTreeUri } from './resources/forum-tree.js';
+import { CrawlerRuntime, realCrawlerFactory } from './runtime/crawler-runtime.js';
+import { BoardLockManager } from './runtime/locks.js';
 
 async function main(): Promise<void> {
   let config;
@@ -22,13 +24,20 @@ async function main(): Promise<void> {
 
   const readers = openReaders(config.data_dir);
 
+  const crawler = new CrawlerRuntime({
+    siteKey: config.crawler.site_key,
+    dataDir: config.data_dir,
+    factory: realCrawlerFactory,
+  });
+  const locks = new BoardLockManager();
+
   const server = new McpServer({
     name: 'bbs-mcp',
     version: '0.0.0',
   });
 
   // M0: graph 永远 disabled。M4 计划再启用
-  registerTools(server, { config, graphEnabled: false, readers });
+  registerTools(server, { config, graphEnabled: false, readers, crawler, locks });
 
   // M1: forum-tree resource
   server.resource(

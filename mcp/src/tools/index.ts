@@ -5,21 +5,27 @@ import { listBoardsTool } from './core/list-boards.js';
 import { threadsByBoardTool } from './core/threads-by-board.js';
 import { getThreadTool } from './core/get-thread.js';
 import { searchThreadsTool } from './core/search-threads.js';
+import { crawlTool } from './core/crawl.js';
 import type { McpConfig } from '../config/schema.js';
 import { toMcpError } from '../errors.js';
 import { getLogger } from '../runtime/logger.js';
 import type { Readers } from '../runtime/sqlite-readers.js';
+import type { CrawlerRuntime } from '../runtime/crawler-runtime.js';
+import type { BoardLockManager } from '../runtime/locks.js';
 
 export interface RegisterOptions {
   config: McpConfig;
   graphEnabled: boolean;
   readers: Readers;
+  crawler: CrawlerRuntime;
+  locks: BoardLockManager;
 }
 
 export function registerTools(server: McpServer, opts: RegisterOptions): void {
   const log = getLogger();
 
   const sharedCtx = { readers: opts.readers, graphEnabled: opts.graphEnabled };
+  const crawlCtx = { crawler: opts.crawler, locks: opts.locks };
 
   registerTool(server, pingTool, {}, log);
   registerTool(server, listSitesTool, sharedCtx, log);
@@ -27,8 +33,9 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
   registerTool(server, threadsByBoardTool, sharedCtx, log);
   registerTool(server, getThreadTool, sharedCtx, log);
   registerTool(server, searchThreadsTool, sharedCtx, log);
+  registerTool(server, crawlTool, crawlCtx, log);
 
-  log.info({ graphEnabled: opts.graphEnabled, registered: 6 }, 'tools registered');
+  log.info({ graphEnabled: opts.graphEnabled, registered: 7 }, 'tools registered');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
