@@ -76,14 +76,14 @@ cp bbs-mcp.config.example.json bbs-mcp.config.json
 
 | Script | What |
 |---|---|
-| `npm run setup` | Clone subprojects, install deps, build, install Playwright Chromium locally |
-| `npm run init:crawler:login` | Run crawler's interactive login (once per credential rotation) |
+| `npm run setup` | Clone subprojects, install deps, build, install Playwright Chromium locally (skipped if `BROWSER_EXECUTABLE_PATH` is set) |
+| `npm run login` | Interactive crawler login (writes `BBS_Crawler/.state/<site>.json`). Same as `init:crawler:login` |
+| `npm run init` | End-to-end: auto-login if no storage state exists, then crawl sections + boards, then `init:db` |
 | `npm run init:crawler:sections` | Crawl top-level forum sections into structure.db |
 | `npm run init:crawler:boards` | Crawl all boards under sections |
 | `npm run init:crawler:threads` | Crawl pinned threads (baseline) for each board |
-| `npm run init:crawler` | sections + boards in order |
+| `npm run init:crawler` | sections + boards in order (does NOT auto-login) |
 | `npm run init:db` | Bootstrap bbs-database (placeholder until M4+) |
-| `npm run init` | `init:crawler` then `init:db` |
 | `npm run build:crawler` / `build:mcp` / `build` | Rebuild after pulling upstream changes |
 | `npm run register` | Register this clone with Claude Code (writes `.mcp.json`) |
 | `npm run register -- --desktop` | Same but for Claude Desktop's user-global config |

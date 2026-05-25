@@ -144,9 +144,14 @@ console.log(`
 
 Next steps:
   1. Edit .env — fill in SCHOOL_BBS_USERNAME / SCHOOL_BBS_PASSWORD / SCHOOL_BBS_BASE_URL
-  2. Run \`npm run init\` to log in and bootstrap crawler data
-  3. Copy bbs-mcp.config.example.json to bbs-mcp.config.json and adjust paths
-  4. Register the server in Claude Desktop (see README.md)
+     (optional: set MCP_SERVER_NAME if you have multiple installs on this machine)
+  2. \`npm run init\` — auto-runs login (browser pops up if no storage state yet),
+                       then crawls sections + boards.
+  3. \`cp bbs-mcp.config.example.json bbs-mcp.config.json\`
+     (no path edits needed; the loader resolves relative paths against the config file's dir.)
+  4. \`npm run register\` — write .mcp.json for Claude Code CLI.
+     Or \`npm run register -- --desktop\` for Claude Desktop.
+  5. Start a Claude session in this folder and verify with /mcp.
 
 For details: README.md
 `);
