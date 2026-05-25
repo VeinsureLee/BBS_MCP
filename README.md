@@ -36,9 +36,11 @@ BBS_MCP/                            ← clone here
 
 - Node.js **≥ 20**
 - Git
-- ~1 GB free disk (Playwright Chromium bundle ≈ 400 MB)
+- ~1 GB free disk (Playwright Chromium bundle ≈ 400 MB) — **or** an existing Chrome/Chromium install you point at via `BROWSER_EXECUTABLE_PATH` in `.env`
 
-That's it. No global npm packages. No system services. No `~/.cache` pollution — Playwright browsers land in `./.cache/ms-playwright/`.
+That's it. No global npm packages. No system services. No `~/.cache` pollution — Playwright browsers land in `./.cache/ms-playwright/` if they're downloaded at all.
+
+If you set `BROWSER_EXECUTABLE_PATH` in `.env` to an existing browser binary BEFORE running `npm run setup`, the Playwright download step is skipped (saves ~400 MB).
 
 ## Setup (fresh machine)
 
@@ -47,9 +49,15 @@ That's it. No global npm packages. No system services. No `~/.cache` pollution �
 git clone https://github.com/VeinsureLee/BBS_MCP.git
 cd BBS_MCP
 
-# 2. One-shot setup
+# 2. (Optional) Pre-create .env if you already have a local Chrome:
+#    cp .env.example .env
+#    then edit .env and set BROWSER_EXECUTABLE_PATH=C:/path/to/chrome.exe
+#    — setup will detect this and skip the ~400 MB Playwright download.
+
+# 3. One-shot setup
 #    Clones BBS_Crawler + BBS_Database, installs deps, builds them,
 #    installs Playwright Chromium into ./.cache/ms-playwright/
+#    (unless step 2 supplied a working BROWSER_EXECUTABLE_PATH).
 npm run setup
 
 # 3. Edit .env (created from .env.example during setup)
