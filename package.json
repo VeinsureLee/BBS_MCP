@@ -7,5 +7,23 @@
     "BBS_Database",
     "mcp"
   ],
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "build:crawler": "node scripts/run.mjs npm run -w bbs-crawler build",
+    "build:mcp": "node scripts/run.mjs npm run -w bbs-mcp build",
+    "build": "npm run build:crawler && npm run build:mcp",
+    "init:crawler:login": "node scripts/run.mjs npm run -w bbs-crawler login",
+    "init:crawler:sections": "node scripts/run.mjs npm run -w bbs-crawler init:sections",
+    "init:crawler:boards": "node scripts/run.mjs npm run -w bbs-crawler init:boards",
+    "init:crawler:threads": "node scripts/run.mjs npm run -w bbs-crawler init:threads",
+    "init:crawler": "npm run init:crawler:sections && npm run init:crawler:boards",
+    "init:db": "node scripts/run.mjs node scripts/init-db.mjs",
+    "init": "npm run init:crawler && npm run init:db",
+    "start": "node scripts/run.mjs node mcp/dist/server.js",
+    "dev:mcp": "node scripts/run.mjs npm run -w bbs-mcp dev",
+    "test": "node scripts/run.mjs npm run -w bbs-mcp test",
+    "lint": "node scripts/run.mjs npm run -w bbs-mcp lint:tsc",
+    "clean": "node -e \"const{rmSync}=require('node:fs');for(const p of ['BBS_Crawler/dist','BBS_Database/dist','mcp/dist','logs','.cache']) try{rmSync(p,{recursive:true,force:true});console.log('rm',p);}catch(e){}\""
+  }
 }

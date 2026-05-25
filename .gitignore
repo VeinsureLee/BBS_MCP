@@ -21,3 +21,11 @@ Thumbs.db
 # Local config / data
 bbs-mcp.config.json
 logs/
+
+# Project-local caches
+.cache/
+.state/
+data/
+
+# Playwright (covered by .cache/ above, listed explicitly for clarity)
+.cache/ms-playwright/
