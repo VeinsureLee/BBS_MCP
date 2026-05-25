@@ -154,22 +154,40 @@ export const realCrawlerFactory: CrawlerFactory = async ({ siteKey, dataDir }) =
   //
   // We try both. dotenv silently ignores missing files; existing process.env
   // values take precedence over .env contents in both calls.
+  const { createRequire } = await import('node:module');
+  const { dirname, resolve } = await import('node:path');
+  const { pathToFileURL } = await import('node:url');
+  const requireFromHere = createRequire(import.meta.url);
+  const crawlerEntry = requireFromHere.resolve('bbs-crawler');
+  // crawlerEntry = <crawlerRoot>/dist/index.js → up 1 = <crawlerRoot>/dist,
+  // up 2 = <crawlerRoot>, up 3 = <monorepoRoot>.
+  const distDir = dirname(crawlerEntry);
+  const crawlerRoot = resolve(distDir, '..');
+  const monorepoRoot = resolve(crawlerRoot, '..');
+
   try {
-    const { createRequire } = await import('node:module');
     const dotenv = await import('dotenv');
-    const { dirname, resolve } = await import('node:path');
-    const requireFromHere = createRequire(import.meta.url);
-    const crawlerEntry = requireFromHere.resolve('bbs-crawler');
-    // crawlerEntry = <crawlerRoot>/dist/index.js → up 2 = <crawlerRoot>,
-    // up 3 = <monorepoRoot>.
-    const crawlerRoot = resolve(dirname(crawlerEntry), '..');
-    const monorepoRoot = resolve(crawlerRoot, '..');
     dotenv.config({ path: `${monorepoRoot}/.env` });
     dotenv.config({ path: `${crawlerRoot}/.env` });
   } catch {
     // .env is optional — if missing or unreadable, fall through with whatever
     // env vars the launching shell already provided.
   }
+
+  // Site config (YAML) loader inside bbs-crawler defaults to
+  // `process.cwd()/config/sites/` — which is wrong when the MCP server is
+  // launched from an arbitrary directory. Point it at the crawler's own
+  // bundled config dir before any adapter side-effect load reads it.
+  if (!process.env.SITE_CONFIG_DIR) {
+    process.env.SITE_CONFIG_DIR = resolve(crawlerRoot, 'config/sites');
+  }
+
+  // Side-effect import to register all built-in site adapters with the crawler
+  // registry. bbs-crawler's main entry doesn't do this auto-load — the package
+  // exports field gates submodule access, so we go through the dist filesystem
+  // path. Without this, getAdapter(siteKey) returns null and CrawlerService
+  // throws UnknownSiteError on the first crawl call.
+  await import(pathToFileURL(resolve(distDir, 'adapters/index.js')).href);
 
   // Now parse the (possibly enriched) env into AppConfig so we honor user
   // browser/headless/rate settings instead of hardcoding them.
