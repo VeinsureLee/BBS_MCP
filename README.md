@@ -87,10 +87,10 @@ cp bbs-mcp.config.example.json bbs-mcp.config.json
 | `npm run init:crawler` | sections + boards in order (does NOT auto-login) |
 | `npm run init:db` | Bootstrap bbs-database (placeholder until M4+) |
 | `npm run build:crawler` / `build:mcp` / `build` | Rebuild after pulling upstream changes |
-| `npm run register` | Register this clone with Claude Code (writes `.mcp.json`) |
+| `npm run register` | Register this clone with Claude Code (writes `.mcp.json` here) |
+| `npm run register -- --at <dir>` | Same but write `.mcp.json` in `<dir>` (use when `claude` is launched from a parent) |
 | `npm run register -- --desktop` | Same but for Claude Desktop's user-global config |
-| `npm run unregister` | Remove from `.mcp.json` |
-| `npm run unregister -- --desktop` | Remove from Claude Desktop's user-global config |
+| `npm run unregister` / `-- --at <dir>` / `-- --desktop` | Inverse of the above |
 | `npm run start` | Run the MCP server on stdio (for manual testing) |
 | `npm run dev:mcp` | Same but via `tsx` (no rebuild needed) |
 | `npm run test` | Vitest suite for `bbs-mcp` |
@@ -107,7 +107,19 @@ cp bbs-mcp.config.example.json bbs-mcp.config.json
 npm run register
 ```
 
-Writes `.mcp.json` at the project root. Claude Code auto-discovers it when you start `claude` in this directory. `.mcp.json` is gitignored (paths are absolute and machine-specific), so each clone configures itself independently.
+Writes `.mcp.json` at the project root (`BBS_MCP/.mcp.json`). Claude Code auto-discovers it when you `claude` from this directory. `.mcp.json` is gitignored (paths are absolute and machine-specific), so each clone configures itself independently.
+
+**Running Claude Code from a parent directory?** Claude Code looks for `.mcp.json` only in its cwd at startup — it doesn't walk upward. If your workflow is `cd parent && claude` and `parent/BBS_MCP/` is the clone, use `--at`:
+
+```bash
+# from inside BBS_MCP/, write .mcp.json into the parent
+npm run register -- --at ..
+
+# or any absolute path
+npm run register -- --at D:/MyProject/BBS_Agent_Project/test
+```
+
+The generated `.mcp.json` still points at this clone's `mcp/dist/server.js` (absolute path), so it works regardless of where you put the `.mcp.json`.
 
 ### Claude Desktop — user-global registration
 

@@ -2,17 +2,25 @@
 /**
  * Register THIS project clone with a Claude MCP client.
  *
- *   npm run register              → write project-root .mcp.json
- *                                   (Claude Code CLI auto-discovers it when
- *                                    started in this directory; this is the
- *                                    "local-only, this folder configures
- *                                    this folder" path.)
- *   npm run register -- --desktop → write user-global Claude Desktop config
- *                                   (%APPDATA%\Claude\claude_desktop_config.json
- *                                    on Windows, ~/Library/Application Support
- *                                    on macOS, ~/.config on Linux)
- *   npm run unregister            → remove from .mcp.json
- *   npm run unregister -- --desktop → remove from Claude Desktop config
+ *   npm run register                  → write .mcp.json in THIS project root
+ *                                       (i.e. BBS_MCP/)
+ *   npm run register -- --at <dir>    → write .mcp.json in <dir> instead
+ *                                       (use when you `claude` from a PARENT
+ *                                        directory that contains BBS_MCP, e.g.
+ *                                        `npm run register -- --at ..`)
+ *   npm run register -- --desktop     → write user-global Claude Desktop config
+ *                                       (%APPDATA%\Claude\claude_desktop_config.json
+ *                                        on Windows, ~/Library/Application Support
+ *                                        on macOS, ~/.config on Linux). Ignores --at.
+ *   npm run unregister                → remove from this project's .mcp.json
+ *   npm run unregister -- --at <dir>  → remove from <dir>/.mcp.json
+ *   npm run unregister -- --desktop   → remove from Claude Desktop config
+ *
+ * Why --at exists:
+ *   Claude Code CLI looks for `.mcp.json` only in its own cwd at startup. If
+ *   your workflow is `cd <parent>/test && claude` and BBS_MCP is at
+ *   <parent>/test/BBS_MCP/, then `test/` is where .mcp.json needs to live.
+ *   `npm run register -- --at ..` from inside BBS_MCP/ writes it there.
  *
  * Server entry name:
  *   `MCP_SERVER_NAME` from .env (default "bbs"). Change per clone if you have
@@ -26,13 +34,24 @@
  * cwd to its own location, so relative paths break.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
 const args = process.argv.slice(2);
 const remove = args.includes('--remove');
 const useDesktop = args.includes('--desktop');
+
+// --at <dir>  : extract the value following --at, if present.
+let atDir;
+const atIdx = args.indexOf('--at');
+if (atIdx >= 0) {
+  if (atIdx + 1 >= args.length || args[atIdx + 1].startsWith('--')) {
+    console.error('--at requires a directory argument');
+    process.exit(1);
+  }
+  atDir = args[atIdx + 1];
+}
 
 function claudeDesktopConfigPath() {
   if (process.platform === 'win32') {
@@ -90,8 +109,28 @@ if (!remove) {
   }
 }
 
-const targetPath = useDesktop ? claudeDesktopConfigPath() : resolve('.mcp.json');
-const targetLabel = useDesktop ? 'Claude Desktop user-global config' : 'project .mcp.json (Claude Code CLI)';
+let targetPath;
+let targetLabel;
+if (useDesktop) {
+  if (atDir) {
+    console.error('--at cannot be combined with --desktop (Claude Desktop has a fixed global path)');
+    process.exit(1);
+  }
+  targetPath = claudeDesktopConfigPath();
+  targetLabel = 'Claude Desktop user-global config';
+} else {
+  const baseDir = atDir ? resolve(atDir) : resolve('.');
+  if (!existsSync(baseDir)) {
+    console.error(`--at directory does not exist: ${baseDir}`);
+    process.exit(1);
+  }
+  if (!statSync(baseDir).isDirectory()) {
+    console.error(`--at target is not a directory: ${baseDir}`);
+    process.exit(1);
+  }
+  targetPath = join(baseDir, '.mcp.json');
+  targetLabel = `.mcp.json in ${baseDir} (Claude Code CLI)`;
+}
 
 let cfg = {};
 if (existsSync(targetPath)) {
