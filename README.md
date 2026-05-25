@@ -78,10 +78,12 @@ cp bbs-mcp.config.example.json bbs-mcp.config.json
 |---|---|
 | `npm run setup` | Clone subprojects, install deps, build, install Playwright Chromium locally (skipped if `BROWSER_EXECUTABLE_PATH` is set) |
 | `npm run login` | Interactive crawler login (writes `BBS_Crawler/.state/<site>.json`). Same as `init:crawler:login` |
-| `npm run init` | End-to-end: auto-login if no storage state exists, then crawl sections + boards, then `init:db` |
+| `npm run init` | End-to-end: auto-login if no storage state exists, then crawl sections + boards, then `init:db`. **Threads are NOT crawled** — use MCP's `forum_crawl` for on-demand, or `init:full` for bulk |
+| `npm run init:full` | Same as `init` but ALSO crawls pinned + plain page-1 threads for every board (slow: 20+ min on 286 boards) |
 | `npm run init:crawler:sections` | Crawl top-level forum sections into structure.db |
 | `npm run init:crawler:boards` | Crawl all boards under sections |
-| `npm run init:crawler:threads` | Crawl pinned threads (baseline) for each board |
+| `npm run init:crawler:threads` | Crawl pinned threads only across all boards. Accepts crawler flags via `-- ...`, e.g. `npm run init:crawler:threads -- --limit 5 --concurrency 4` |
+| `npm run init:crawler:threads:full` | Same as `:threads` but adds `--with-plain` (pinned + plain page 1) |
 | `npm run init:crawler` | sections + boards in order (does NOT auto-login) |
 | `npm run init:db` | Bootstrap bbs-database (placeholder until M4+) |
 | `npm run build:crawler` / `build:mcp` / `build` | Rebuild after pulling upstream changes |

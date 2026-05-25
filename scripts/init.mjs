@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
  * Orchestrates `npm run init` end-to-end:
- *   1. Check for crawler storage state (BBS_Crawler/.state/*.json)
- *   2. If missing → run login (interactive; pops a browser)
- *      If present → skip login (avoid re-popping browser on every re-init)
- *   3. init:crawler:sections
- *   4. init:crawler:boards
+ *   1. Check for crawler storage state (BBS_Crawler/.state/*.json).
+ *      Missing → run login (interactive, pops browser).
+ *      Present → skip login (don't re-pop browser on every re-init).
+ *   2. init:crawler:sections
+ *   3. init:crawler:boards
+ *   4. [if --full] init:crawler:threads:full   (pinned + plain page 1 across all boards; SLOW)
  *   5. init:db (placeholder for M4+)
  *
- * Each substep delegates to an existing root npm script. Storage state check
- * is just "does BBS_Crawler/.state/ contain any .json file"; the crawler's
- * own login script writes <siteKey>.json to that dir.
+ * Usage:
+ *   node scripts/init.mjs           ← structure only (fast; threads via MCP on demand)
+ *   node scripts/init.mjs --full    ← structure + bulk threads (pinned + plain page 1)
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -18,6 +19,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const isWindows = process.platform === 'win32';
+const full = process.argv.includes('--full');
 
 function run(cmd, args) {
   const finalCmd = isWindows ? 'cmd.exe' : cmd;
@@ -45,6 +47,13 @@ run('npm', ['run', 'init:crawler:sections']);
 
 console.log('\n[init] crawling boards...');
 run('npm', ['run', 'init:crawler:boards']);
+
+if (full) {
+  console.log('\n[init] crawling threads (pinned + plain page 1, all boards) — this can take 20+ minutes...');
+  run('npm', ['run', 'init:crawler:threads:full']);
+} else {
+  console.log('\n[init] skipping threads bulk crawl (run with --full or use forum_crawl via MCP for on-demand)');
+}
 
 console.log('\n[init] init:db...');
 run('npm', ['run', 'init:db']);
