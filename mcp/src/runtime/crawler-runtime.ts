@@ -148,12 +148,18 @@ export const realCrawlerFactory: CrawlerFactory = async ({ siteKey, dataDir }) =
   // crawler.parseConfig. The crawler's own CLI scripts do this via top-level
   // `import 'dotenv/config'`; we replicate that here so MCP-launched crawls
   // see the same env the crawler-CLI scripts see.
+  //
+  // To locate BBS_Crawler/, we resolve its main entry (bbs-crawler exports
+  // only `.` so require.resolve('bbs-crawler/package.json') is forbidden by
+  // the exports field) and walk up from dist/index.js to the package root.
   try {
     const { createRequire } = await import('node:module');
     const dotenv = await import('dotenv');
+    const { dirname, resolve } = await import('node:path');
     const requireFromHere = createRequire(import.meta.url);
-    const crawlerPkgPath = requireFromHere.resolve('bbs-crawler/package.json');
-    const crawlerRoot = (await import('node:path')).dirname(crawlerPkgPath);
+    const crawlerEntry = requireFromHere.resolve('bbs-crawler');
+    // crawlerEntry = <crawlerRoot>/dist/index.js → up 2 levels = <crawlerRoot>
+    const crawlerRoot = resolve(dirname(crawlerEntry), '..');
     dotenv.config({ path: `${crawlerRoot}/.env` });
   } catch {
     // .env is optional — if missing or unreadable, fall through with whatever
