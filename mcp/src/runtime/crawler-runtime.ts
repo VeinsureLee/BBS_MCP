@@ -143,20 +143,43 @@ export const realCrawlerFactory: CrawlerFactory = async ({ siteKey, dataDir }) =
   // @ts-ignore -- TS2307: bbs-crawler types require a `npm run build` in BBS_Crawler first
   const crawler: any = await import('bbs-crawler');
 
-  // initDb is synchronous — await is harmless but kept for consistency with plan.
-  crawler.initDb({ dataDir });
+  // Load BBS_Crawler/.env so BROWSER_EXECUTABLE_PATH, STORAGE_STATE_DIR,
+  // SCHOOL_BBS_* credentials etc. flow into process.env before we call
+  // crawler.parseConfig. The crawler's own CLI scripts do this via top-level
+  // `import 'dotenv/config'`; we replicate that here so MCP-launched crawls
+  // see the same env the crawler-CLI scripts see.
+  try {
+    const { createRequire } = await import('node:module');
+    const dotenv = await import('dotenv');
+    const requireFromHere = createRequire(import.meta.url);
+    const crawlerPkgPath = requireFromHere.resolve('bbs-crawler/package.json');
+    const crawlerRoot = (await import('node:path')).dirname(crawlerPkgPath);
+    dotenv.config({ path: `${crawlerRoot}/.env` });
+  } catch {
+    // .env is optional — if missing or unreadable, fall through with whatever
+    // env vars the launching shell already provided.
+  }
 
-  // Build infrastructure deps.
+  // Now parse the (possibly enriched) env into AppConfig so we honor user
+  // browser/headless/rate settings instead of hardcoding them.
+  const appConfig = crawler.parseConfig({ ...process.env, DATABASE_PATH: dataDir });
+
+  // initDb is synchronous — await is harmless but kept for consistency with plan.
+  crawler.initDb({ dataDir: appConfig.dataDir });
+
+  // Build infrastructure deps from appConfig.
   const rateLimiter = crawler.createRateLimiter({
-    minIntervalMs: 1500,
-    jitterMs: 1000,
-    maxConcurrency: 1,
+    minIntervalMs: appConfig.rateMinIntervalMs,
+    jitterMs: appConfig.rateJitterMs,
+    maxConcurrency: appConfig.rateMaxConcurrency,
   });
 
   const browserPool = new crawler.BrowserPool({
-    headless: true,
-    storageStateDir: `${dataDir}/.state`,
-    idleTimeoutMs: 300_000,
+    headless: appConfig.browserHeadless,
+    executablePath: appConfig.browserExecutablePath,
+    userAgent: appConfig.browserUserAgent,
+    storageStateDir: appConfig.storageStateDir,
+    idleTimeoutMs: appConfig.idleTimeoutMs,
   });
 
   const authManager = new crawler.AuthManager({

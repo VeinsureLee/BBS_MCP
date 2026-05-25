@@ -20,6 +20,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "bbs-crawler": "*",
     "better-sqlite3": "^11.5.0",
+    "dotenv": "^16.4.5",
     "pino": "^9.4.0",
     "zod": "^3.23.8"
   },
