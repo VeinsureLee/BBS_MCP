@@ -20,6 +20,7 @@ Thumbs.db
 
 # Local config / data
 bbs-mcp.config.json
+.mcp.json
 logs/
 
 # Project-local caches

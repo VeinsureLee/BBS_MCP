@@ -20,6 +20,8 @@
     "init:crawler": "npm run init:crawler:sections && npm run init:crawler:boards",
     "init:db": "node scripts/run.mjs node scripts/init-db.mjs",
     "init": "npm run init:crawler && npm run init:db",
+    "register": "node scripts/register-claude.mjs",
+    "unregister": "node scripts/register-claude.mjs --remove",
     "start": "node scripts/run.mjs node mcp/dist/server.js",
     "dev:mcp": "node scripts/run.mjs npm run -w bbs-mcp dev",
     "test": "node scripts/run.mjs npm run -w bbs-mcp test",

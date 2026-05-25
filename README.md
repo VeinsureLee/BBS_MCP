@@ -85,35 +85,50 @@ cp bbs-mcp.config.example.json bbs-mcp.config.json
 | `npm run init:db` | Bootstrap bbs-database (placeholder until M4+) |
 | `npm run init` | `init:crawler` then `init:db` |
 | `npm run build:crawler` / `build:mcp` / `build` | Rebuild after pulling upstream changes |
+| `npm run register` | Register this clone with Claude Code (writes `.mcp.json`) |
+| `npm run register -- --desktop` | Same but for Claude Desktop's user-global config |
+| `npm run unregister` | Remove from `.mcp.json` |
+| `npm run unregister -- --desktop` | Remove from Claude Desktop's user-global config |
 | `npm run start` | Run the MCP server on stdio (for manual testing) |
 | `npm run dev:mcp` | Same but via `tsx` (no rebuild needed) |
 | `npm run test` | Vitest suite for `bbs-mcp` |
 | `npm run lint` | tsc --noEmit |
 | `npm run clean` | Remove `dist/`, `logs/`, `.cache/` |
 
-## Register in Claude Desktop
+## Register the server with your Claude client
 
-Edit `%APPDATA%\Claude\claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`):
+`npm run register` writes the right config for you. Pick your client:
 
-```jsonc
-{
-  "mcpServers": {
-    "bbs": {
-      "command": "node",
-      "args": [
-        "<absolute-path>/BBS_MCP/mcp/dist/server.js"
-      ],
-      "env": {
-        "BBS_MCP_CONFIG": "<absolute-path>/BBS_MCP/bbs-mcp.config.json"
-      }
-    }
-  }
-}
+### Claude Code (CLI) — recommended for "this folder configures this folder"
+
+```bash
+npm run register
 ```
 
-Use **absolute paths** — `cwd` for the server process is set by Claude Desktop and might not match your shell's cwd, so relative paths in `data_dir` / `logging.file` will resolve in surprising places.
+Writes `.mcp.json` at the project root. Claude Code auto-discovers it when you start `claude` in this directory. `.mcp.json` is gitignored (paths are absolute and machine-specific), so each clone configures itself independently.
 
-Fully quit Claude Desktop (system tray too) and reopen. You should see `bbs` in `/mcp` with 8 tools and 1 resource.
+### Claude Desktop — user-global registration
+
+```bash
+npm run register -- --desktop
+```
+
+Writes to `%APPDATA%\Claude\claude_desktop_config.json` on Windows (macOS: `~/Library/Application Support/Claude/`, Linux: `~/.config/Claude/`). Pre-existing `mcpServers` entries are preserved; only the entry matching `MCP_SERVER_NAME` is added/updated. Fully quit Claude Desktop (system tray too) and reopen for the change to apply.
+
+### Multiple installs on the same machine
+
+Each clone has its own `.env` with `MCP_SERVER_NAME=...`. Change the name per install (`bbs`, `bbs-test`, `bbs-dev`, etc.) so they don't collide in Claude Desktop's global list. `.mcp.json` files are project-local so they naturally don't conflict.
+
+### Undo
+
+```bash
+npm run unregister              # remove entry from project .mcp.json
+npm run unregister -- --desktop # remove entry from Claude Desktop config
+```
+
+### Why does the loader resolve paths relative to the config file?
+
+Because Claude Desktop / Claude Code set the spawned MCP server's cwd to their own location, not yours. If `bbs-mcp.config.json` says `"data_dir": "./BBS_Crawler/data/crawler.db"`, the MCP loader now resolves it relative to **the directory containing the config file** — so the same JSON works no matter who launches the server. You don't need absolute paths inside `bbs-mcp.config.json`; the example file's relative paths are fine.
 
 ## What tools are exposed
 

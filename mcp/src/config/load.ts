@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { parseMcpConfig, type McpConfig } from './schema.js';
 
 export class ConfigError extends Error {
@@ -9,8 +9,22 @@ export class ConfigError extends Error {
   }
 }
 
+/**
+ * Resolve a path field from the config file relative to the config file's
+ * directory (NOT the process cwd). This makes a single `bbs-mcp.config.json`
+ * portable: the same file works no matter where the user launches the server
+ * from — Claude Desktop, a different shell, or a sibling project — as long
+ * as the relative paths inside it are written relative to the config itself.
+ */
+function resolveAgainst(baseDir: string, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return isAbsolute(value) ? value : resolve(baseDir, value);
+}
+
 export function loadMcpConfig(configPath: string): McpConfig {
   const abs = resolve(configPath);
+  const baseDir = dirname(abs);
+
   let raw: unknown;
   try {
     const text = readFileSync(abs, 'utf-8');
@@ -18,11 +32,29 @@ export function loadMcpConfig(configPath: string): McpConfig {
   } catch (e) {
     throw new ConfigError(`failed to read/parse config at ${abs}`, e);
   }
+
+  let parsed: McpConfig;
   try {
-    return parseMcpConfig(raw);
+    parsed = parseMcpConfig(raw);
   } catch (e) {
     throw new ConfigError(`config validation failed for ${abs}`, e);
   }
+
+  // Resolve every path-bearing field against the config file's directory so
+  // downstream code can treat them as absolute paths without thinking about
+  // the launching process's cwd.
+  parsed.data_dir = resolveAgainst(baseDir, parsed.data_dir)!;
+  if (parsed.crawler.config_path) {
+    parsed.crawler.config_path = resolveAgainst(baseDir, parsed.crawler.config_path);
+  }
+  if (parsed.graph.database_config_path) {
+    parsed.graph.database_config_path = resolveAgainst(baseDir, parsed.graph.database_config_path);
+  }
+  if (parsed.logging.file) {
+    parsed.logging.file = resolveAgainst(baseDir, parsed.logging.file);
+  }
+
+  return parsed;
 }
 
 export function loadFromEnv(): McpConfig {
