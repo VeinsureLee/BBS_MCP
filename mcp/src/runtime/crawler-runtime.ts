@@ -143,23 +143,28 @@ export const realCrawlerFactory: CrawlerFactory = async ({ siteKey, dataDir }) =
   // @ts-ignore -- TS2307: bbs-crawler types require a `npm run build` in BBS_Crawler first
   const crawler: any = await import('bbs-crawler');
 
-  // Load BBS_Crawler/.env so BROWSER_EXECUTABLE_PATH, STORAGE_STATE_DIR,
-  // SCHOOL_BBS_* credentials etc. flow into process.env before we call
-  // crawler.parseConfig. The crawler's own CLI scripts do this via top-level
-  // `import 'dotenv/config'`; we replicate that here so MCP-launched crawls
-  // see the same env the crawler-CLI scripts see.
+  // Load .env so BROWSER_EXECUTABLE_PATH, STORAGE_STATE_DIR, SCHOOL_BBS_*
+  // credentials etc. flow into process.env before we call crawler.parseConfig.
+  // The crawler's own CLI scripts do this via top-level `import 'dotenv/config'`;
+  // we replicate that here so MCP-launched crawls see the same env.
   //
-  // To locate BBS_Crawler/, we resolve its main entry (bbs-crawler exports
-  // only `.` so require.resolve('bbs-crawler/package.json') is forbidden by
-  // the exports field) and walk up from dist/index.js to the package root.
+  // .env may live in either of two locations depending on deployment style:
+  //   1. Monorepo root (newer convention — `e83a4cc unify deployment story`)
+  //   2. BBS_Crawler/ package root (older / per-crawler override)
+  //
+  // We try both. dotenv silently ignores missing files; existing process.env
+  // values take precedence over .env contents in both calls.
   try {
     const { createRequire } = await import('node:module');
     const dotenv = await import('dotenv');
     const { dirname, resolve } = await import('node:path');
     const requireFromHere = createRequire(import.meta.url);
     const crawlerEntry = requireFromHere.resolve('bbs-crawler');
-    // crawlerEntry = <crawlerRoot>/dist/index.js → up 2 levels = <crawlerRoot>
+    // crawlerEntry = <crawlerRoot>/dist/index.js → up 2 = <crawlerRoot>,
+    // up 3 = <monorepoRoot>.
     const crawlerRoot = resolve(dirname(crawlerEntry), '..');
+    const monorepoRoot = resolve(crawlerRoot, '..');
+    dotenv.config({ path: `${monorepoRoot}/.env` });
     dotenv.config({ path: `${crawlerRoot}/.env` });
   } catch {
     // .env is optional — if missing or unreadable, fall through with whatever
