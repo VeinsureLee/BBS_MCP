@@ -1,68 +1,81 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { pingTool } from './core/ping.js';
-import { listSitesTool } from './core/list-sites.js';
-import { listBoardsTool } from './core/list-boards.js';
-import { threadsByBoardTool } from './core/threads-by-board.js';
-import { getThreadTool } from './core/get-thread.js';
-import { searchThreadsTool } from './core/search-threads.js';
-import { crawlTool } from './core/crawl.js';
-import { statusTool } from './core/status.js';
-import type { McpConfig } from '../config/schema.js';
+import type { Crawler } from 'bbs-crawler';
+import { listSitesTool } from './read/list-sites.js';
+import { listSectionsTool } from './read/list-sections.js';
+import { listBoardsTool } from './read/list-boards.js';
+import { sectionDetailTool } from './read/section-detail.js';
+import { boardThreadsTool } from './read/board-threads.js';
+import { getThreadTool } from './read/get-thread.js';
+import { searchLocalTool } from './read/search-local.js';
+import { crawlBoardTool } from './crawl/crawl-board.js';
+import { crawlThreadTool } from './crawl/crawl-thread.js';
+import { initTool } from './init.js';
+import { pingTool } from './meta/ping.js';
+import { statusTool } from './meta/status.js';
 import { toMcpError } from '../errors.js';
 import { getLogger } from '../runtime/logger.js';
-import type { Readers } from '../runtime/sqlite-readers.js';
-import type { CrawlerRuntime } from '../runtime/crawler-runtime.js';
 import type { BoardLockManager } from '../runtime/locks.js';
 
 export interface RegisterOptions {
-  config: McpConfig;
-  graphEnabled: boolean;
-  readers: Readers;
-  crawler: CrawlerRuntime;
+  crawler: Crawler;
   locks: BoardLockManager;
+  graphEnabled: boolean;
+  version: string;
+  startedAt: number;
+  siteKey: string;
 }
 
 export function registerTools(server: McpServer, opts: RegisterOptions): void {
   const log = getLogger();
+  const readCtx = { crawler: opts.crawler };
+  const crawlBoardCtx = { crawler: opts.crawler, locks: opts.locks, siteKey: opts.siteKey };
+  const crawlThreadCtx = { crawler: opts.crawler, siteKey: opts.siteKey };
+  const initCtx = { crawler: opts.crawler, siteKey: opts.siteKey };
+  const statusCtx = { crawler: opts.crawler, graphEnabled: opts.graphEnabled, version: opts.version, startedAt: opts.startedAt, siteKey: opts.siteKey };
+  const pingCtx = { version: opts.version, startedAt: opts.startedAt };
 
-  const sharedCtx = { readers: opts.readers, graphEnabled: opts.graphEnabled };
-  const crawlCtx = { crawler: opts.crawler, locks: opts.locks };
-  const statusCtx = { readers: opts.readers, crawler: opts.crawler, graphEnabled: opts.graphEnabled };
+  const all = [
+    [listSitesTool,     readCtx],
+    [listSectionsTool,  readCtx],
+    [listBoardsTool,    readCtx],
+    [sectionDetailTool, readCtx],
+    [boardThreadsTool,  readCtx],
+    [getThreadTool,     readCtx],
+    [searchLocalTool,   readCtx],
+    [crawlBoardTool,    crawlBoardCtx],
+    [crawlThreadTool,   crawlThreadCtx],
+    [initTool,          initCtx],
+    [statusTool,        statusCtx],
+    [pingTool,          pingCtx],
+  ] as const;
 
-  registerTool(server, pingTool, {}, log);
-  registerTool(server, listSitesTool, sharedCtx, log);
-  registerTool(server, listBoardsTool, sharedCtx, log);
-  registerTool(server, threadsByBoardTool, sharedCtx, log);
-  registerTool(server, getThreadTool, sharedCtx, log);
-  registerTool(server, searchThreadsTool, sharedCtx, log);
-  registerTool(server, crawlTool, crawlCtx, log);
-  registerTool(server, statusTool, statusCtx, log);
-
-  log.info({ graphEnabled: opts.graphEnabled, registered: 8 }, 'tools registered');
+  for (const [tool, ctx] of all) {
+    registerOne(server, tool as any, ctx as any, log);
+  }
+  log.info({ graphEnabled: opts.graphEnabled, registered: all.length }, 'tools registered');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyTool = { name: string; description: string; inputSchema: { shape: Record<string, import('zod').ZodTypeAny>; parse: (input: unknown) => any }; handler: (input: any, ctx?: any) => Promise<unknown> };
+function getShape(schema: import('zod').ZodTypeAny): Record<string, import('zod').ZodTypeAny> {
+  // ZodObject has .shape; ZodEffects (from .refine) wraps it
+  if ((schema as any).shape) return (schema as any).shape;
+  if ((schema as any)._def?.schema?.shape) return (schema as any)._def.schema.shape;
+  throw new Error(`tool inputSchema has no .shape (and no inner schema): ${schema}`);
+}
 
-function registerTool(
+function registerOne(
   server: McpServer,
-  tool: AnyTool,
-  ctx: any,
+  tool: { name: string; description: string; inputSchema: import('zod').ZodTypeAny; handler: (input: any, ctx: any) => Promise<unknown> },
+  ctx: unknown,
   log: ReturnType<typeof getLogger>,
 ): void {
-  // SDK 1.29 McpServer.tool() is deprecated but fully functional.
-  // Signature: tool(name, description, paramsShape, callback)
-  // The callback receives (args, extra) where args is already parsed/validated by the SDK.
   server.tool(
     tool.name,
     tool.description,
-    tool.inputSchema.shape,
+    getShape(tool.inputSchema),
     async (args: Record<string, unknown>) => {
       try {
         const result = await tool.handler(args, ctx);
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
-        };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
       } catch (e) {
         const mcpErr = toMcpError(e);
         log.warn({ tool: tool.name, error_code: mcpErr.error_code, msg: mcpErr.message }, 'tool error');
