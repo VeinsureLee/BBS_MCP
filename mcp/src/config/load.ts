@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { parseMcpConfig, type McpConfig } from './schema.js';
+import { parseMcpConfig, parseLegacyMcpConfig, type McpConfig, type LegacyMcpConfig } from './schema.js';
 
 export class ConfigError extends Error {
   constructor(message: string, public cause?: unknown) {
@@ -21,7 +21,7 @@ function resolveAgainst(baseDir: string, value: string | undefined): string | un
   return isAbsolute(value) ? value : resolve(baseDir, value);
 }
 
-export function loadMcpConfig(configPath: string): McpConfig {
+export function loadMcpConfig(configPath: string): LegacyMcpConfig {
   const abs = resolve(configPath);
   const baseDir = dirname(abs);
 
@@ -33,9 +33,9 @@ export function loadMcpConfig(configPath: string): McpConfig {
     throw new ConfigError(`failed to read/parse config at ${abs}`, e);
   }
 
-  let parsed: McpConfig;
+  let parsed: LegacyMcpConfig;
   try {
-    parsed = parseMcpConfig(raw);
+    parsed = parseLegacyMcpConfig(raw);
   } catch (e) {
     throw new ConfigError(`config validation failed for ${abs}`, e);
   }
@@ -57,10 +57,30 @@ export function loadMcpConfig(configPath: string): McpConfig {
   return parsed;
 }
 
-export function loadFromEnv(): McpConfig {
+export function loadFromEnv(): LegacyMcpConfig {
   const path = process.env.BBS_MCP_CONFIG;
   if (!path) {
     throw new ConfigError('BBS_MCP_CONFIG env var is required');
   }
   return loadMcpConfig(path);
+}
+
+/**
+ * Post-refactor entry point. Reads only the 2 mcp-owned env vars:
+ *   BBS_MCP_LOG_DIR       — pino log file directory (default ".logs/mcp")
+ *   BBS_MCP_GRAPH_ENABLED — "true" to enable graph integration (default false)
+ *
+ * All crawler-side env (DATABASE_PATH, SCHOOL_BBS_*, BROWSER_*, RATE_*, etc.)
+ * is owned and parsed by bbs-crawler's loadAndResolvePaths + parseConfig.
+ * mcp does NOT re-parse them.
+ */
+export function loadMcpConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConfig {
+  try {
+    return parseMcpConfig({
+      logDir: env.BBS_MCP_LOG_DIR,
+      graphEnabled: env.BBS_MCP_GRAPH_ENABLED === 'true',
+    });
+  } catch (e) {
+    throw new ConfigError('mcp config validation failed', e);
+  }
 }
