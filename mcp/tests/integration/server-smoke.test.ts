@@ -53,14 +53,15 @@ describe('server smoke', () => {
     try { await server.close(); } catch {}
   });
 
-  it('lists 12 tools', async () => {
+  it('lists 13 tools', async () => {
     const r = await client.listTools();
-    expect(r.tools).toHaveLength(12);
+    expect(r.tools).toHaveLength(13);
     const names = r.tools.map((t) => t.name).sort();
     expect(names).toEqual([
       'forum_board_threads', 'forum_crawl_board', 'forum_crawl_thread', 'forum_get_thread',
       'forum_init', 'forum_list_boards', 'forum_list_sections', 'forum_list_sites',
-      'forum_search_local', 'forum_section_detail', 'forum_status', 'ping',
+      'forum_login', 'forum_search_local', 'forum_section_detail', 'forum_status',
+      'ping',
     ]);
   });
 
