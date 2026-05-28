@@ -8,6 +8,7 @@ vi.mock('bbs-crawler', () => ({
 }));
 
 import { loginTool } from '../../../src/tools/auth/login';
+import { getBrowserReady, _resetForTests } from '../../../src/runtime/crawler';
 
 const tmpDirs: string[] = [];
 function mkTmp(): string {
@@ -120,5 +121,23 @@ describe('loginTool', () => {
     delete process.env.SCHOOL_BBS_USERNAME;
     const out = await loginTool.handler({}, ctx);
     expect(out.username).toBeNull();
+  });
+
+  it('flips runtime browserReady=true on successful login', async () => {
+    _resetForTests();
+    expect(getBrowserReady()).toBe(false);
+    const ctx = mockCtx({ stateMtime: Date.now() });
+    await loginTool.handler({}, ctx);
+    expect(getBrowserReady()).toBe(true);
+  });
+
+  it('leaves browserReady=false when adapter.isLoggedIn returns false', async () => {
+    _resetForTests();
+    const { getAdapter } = await import('bbs-crawler');
+    (getAdapter as any).mockReturnValueOnce({ isLoggedIn: vi.fn(async () => false) });
+    const ctx = mockCtx({ stateMtime: Date.now() });
+    const out = await loginTool.handler({}, ctx);
+    expect(out.logged_in).toBe(false);
+    expect(getBrowserReady()).toBe(false);
   });
 });

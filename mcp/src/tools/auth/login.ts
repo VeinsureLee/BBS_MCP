@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { getAdapter, type Crawler } from 'bbs-crawler';
+import { setBrowserReady } from '../../runtime/crawler.js';
 
 export interface LoginContext { crawler: Crawler; siteKey: string; }
 
@@ -43,6 +44,7 @@ export const loginTool = {
       await ctx.crawler.withLoggedInPage(async (page) => {
         loggedIn = await getAdapter(ctx.siteKey).isLoggedIn(page);
       });
+      if (loggedIn) setBrowserReady(true);
       const after = await readStateMtime(ctx.siteKey);
       const source: 'existing_state' | 'fresh_login' =
         after !== null && (before === null || after > before) ? 'fresh_login' : 'existing_state';

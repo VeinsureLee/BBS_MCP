@@ -27,8 +27,15 @@ export function getCrawler(): Crawler {
   return instance;
 }
 
-/** Whether the warm-up cycle has completed successfully. */
+/** Whether the browser is launched + verified logged in. */
 export function getBrowserReady(): boolean { return browserReady; }
+
+/**
+ * Set the browser-ready flag. Used by forum_login when its own login probe
+ * confirms the session is operational, so `forum_status.browser_ready` does
+ * not stay false after startup warm-up failed but agent-driven login succeeded.
+ */
+export function setBrowserReady(value: boolean): void { browserReady = value; }
 
 /**
  * Force browser launch + login verification. Run by server startup
