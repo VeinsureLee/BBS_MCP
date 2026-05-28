@@ -10,6 +10,7 @@ import { searchLocalTool } from './read/search-local.js';
 import { crawlBoardTool } from './crawl/crawl-board.js';
 import { crawlThreadTool } from './crawl/crawl-thread.js';
 import { initTool } from './init.js';
+import { loginTool } from './auth/login.js';
 import { pingTool } from './meta/ping.js';
 import { statusTool } from './meta/status.js';
 import { toMcpError } from '../errors.js';
@@ -31,6 +32,7 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
   const crawlBoardCtx = { crawler: opts.crawler, locks: opts.locks, siteKey: opts.siteKey };
   const crawlThreadCtx = { crawler: opts.crawler, siteKey: opts.siteKey };
   const initCtx = { crawler: opts.crawler, siteKey: opts.siteKey };
+  const loginCtx = { crawler: opts.crawler, siteKey: opts.siteKey };
   const statusCtx = { crawler: opts.crawler, graphEnabled: opts.graphEnabled, version: opts.version, startedAt: opts.startedAt, siteKey: opts.siteKey };
   const pingCtx = { version: opts.version, startedAt: opts.startedAt };
 
@@ -42,6 +44,7 @@ export function registerTools(server: McpServer, opts: RegisterOptions): void {
     [boardThreadsTool,  readCtx],
     [getThreadTool,     readCtx],
     [searchLocalTool,   readCtx],
+    [loginTool,         loginCtx],
     [crawlBoardTool,    crawlBoardCtx],
     [crawlThreadTool,   crawlThreadCtx],
     [initTool,          initCtx],
