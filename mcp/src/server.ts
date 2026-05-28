@@ -1,67 +1,82 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { loadFromEnv, ConfigError } from './config/load.js';
-import { initLogger, getLogger } from './runtime/logger.js';
-import { registerTools } from './tools/index.js';
-import { openReaders } from './runtime/sqlite-readers.js';
-import { buildForumTree, forumTreeUri } from './resources/forum-tree.js';
-import { CrawlerRuntime, realCrawlerFactory } from './runtime/crawler-runtime.js';
+import { loadAndResolvePaths } from 'bbs-crawler';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import * as path from 'node:path';
+import { loadMcpConfigFromEnv, ConfigError } from './config/load.js';
+import { initLoggerFromEnv, getLogger } from './runtime/logger.js';
+import { initCrawler, shutdownCrawler } from './runtime/crawler.js';
 import { BoardLockManager } from './runtime/locks.js';
+import { registerTools } from './tools/index.js';
+import { registerResources } from './resources/index.js';
+
+const SITE_KEY = 'school-bbs';
+
+function readPackageVersion(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  // server.ts compiles to dist/server.js; package.json is one level up
+  const pkgPath = path.resolve(here, '..', 'package.json');
+  try {
+    return (JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version?: string }).version ?? '0.0.0';
+  } catch { return '0.0.0'; }
+}
 
 async function main(): Promise<void> {
-  let config;
+  // 1. .env + path resolution (crawler-owned; mcp piggybacks before reading its own env)
+  loadAndResolvePaths();
+
+  // 2. mcp's own config (just 2 env vars)
+  let cfg;
   try {
-    config = loadFromEnv();
+    cfg = loadMcpConfigFromEnv();
   } catch (e) {
-    // logger 未初始化,直接 stderr
-    console.error('config error:', (e as Error).message);
+    console.error('mcp config error:', (e as ConfigError).message);
     process.exit(2);
   }
 
-  initLogger(config);
+  // 3. logger
+  initLoggerFromEnv({ logDir: cfg.logDir });
   const log = getLogger();
-  log.info({ data_dir: config.data_dir, site: config.crawler.site_key }, 'bbs-mcp starting');
+  const version = readPackageVersion();
+  const startedAt = Date.now();
+  log.info({ logDir: cfg.logDir, graphEnabled: cfg.graphEnabled, version }, 'bbs-mcp starting');
 
-  const readers = openReaders(config.data_dir);
+  // 4. single Crawler instance
+  const crawler = await initCrawler({ siteKey: SITE_KEY });
 
-  const crawler = new CrawlerRuntime({
-    siteKey: config.crawler.site_key,
-    dataDir: config.data_dir,
-    factory: realCrawlerFactory,
-  });
+  // 5. server + tools + resources
+  const server = new McpServer({ name: 'bbs-mcp', version });
   const locks = new BoardLockManager();
-
-  const server = new McpServer({
-    name: 'bbs-mcp',
-    version: '0.0.0',
+  registerTools(server, {
+    crawler,
+    locks,
+    graphEnabled: cfg.graphEnabled,
+    version,
+    startedAt,
+    siteKey: SITE_KEY,
   });
+  registerResources(server, { crawler });
 
-  // M0: graph 永远 disabled。M4 计划再启用
-  registerTools(server, { config, graphEnabled: false, readers, crawler, locks });
+  // 6. shutdown hooks
+  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+    log.info({ signal }, 'bbs-mcp shutting down');
+    try {
+      await shutdownCrawler();
+    } catch (e) {
+      log.warn({ err: String(e) }, 'shutdown error');
+    }
+    process.exit(0);
+  };
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
-  // M1: forum-tree resource
-  server.resource(
-    'forum-tree',
-    forumTreeUri,
-    async (_uri) => ({
-      contents: [
-        {
-          uri: forumTreeUri,
-          mimeType: 'application/json',
-          text: JSON.stringify(buildForumTree(readers)),
-        },
-      ],
-    }),
-  );
-  log.info('forum-tree resource registered');
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  log.info('bbs-mcp listening on stdio');
+  // 7. transport
+  await server.connect(new StdioServerTransport());
+  log.info({ tools: 12, resources: 1 }, 'bbs-mcp listening on stdio');
 }
 
 main().catch((e) => {
-  // 此时 logger 可能未初始化
   try {
     getLogger().error(e, 'fatal');
   } catch {
