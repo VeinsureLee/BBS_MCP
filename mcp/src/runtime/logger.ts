@@ -1,5 +1,5 @@
 import pino, { type Logger } from 'pino';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import type { McpConfig } from '../config/schema.js';
 
@@ -26,4 +26,22 @@ export function getLogger(): Logger {
     throw new Error('logger not initialized; call initLogger first');
   }
   return _logger;
+}
+
+/**
+ * Init logger from mcp's env-driven config. Writes pino logs to
+ * `<logDir>/mcp-<YYYY-MM-DD>.log`. Never writes to stdout (stdio is
+ * reserved for MCP JSON-RPC).
+ *
+ * Post-refactor entry point (server.ts will call this once Task 15 lands).
+ * Internally builds a minimal legacy-shape config and calls initLogger so
+ * we don't duplicate the pino setup.
+ */
+export function initLoggerFromEnv(opts: { logDir: string; level?: 'debug'|'info'|'warn'|'error' }): void {
+  const date = new Date().toISOString().slice(0, 10);
+  const file = join(opts.logDir, `mcp-${date}.log`);
+  // Build the minimum shape initLogger accepts; cast as never to avoid
+  // depending on the full McpConfig type here (Task 16 will collapse the
+  // legacy shape entirely and we'll simplify this then).
+  initLogger({ logging: { level: opts.level ?? 'info', file } } as never);
 }
