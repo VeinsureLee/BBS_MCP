@@ -9,10 +9,11 @@ vi.mock('bbs-crawler', () => {
       runInitBoards: vi.fn(),
       runInitPinned: vi.fn(),
       runRefreshBoardStats: vi.fn(),
-      withLoggedInPage: vi.fn(),
+      withLoggedInPage: vi.fn(async (fn: any) => fn({} as any)),
       shutdown: vi.fn(async () => {}),
     })),
     loadAndResolvePaths: vi.fn(),
+    getAdapter: vi.fn(() => ({ isLoggedIn: vi.fn(async () => true) })),
   };
 });
 
@@ -63,5 +64,47 @@ describe('crawler runtime singleton', () => {
 
   it('shutdownCrawler is safe to call when not initialized', async () => {
     await expect(shutdownCrawler()).resolves.not.toThrow();
+  });
+});
+
+import { warmUpBrowser, getBrowserReady } from '../../src/runtime/crawler';
+
+describe('warmUpBrowser', () => {
+  it('initial getBrowserReady() is false', () => {
+    _resetForTests();
+    expect(getBrowserReady()).toBe(false);
+  });
+
+  it('sets browserReady=true on successful warm-up', async () => {
+    _resetForTests();
+    await initCrawler({ siteKey: 'school-bbs' });
+    await warmUpBrowser('school-bbs');
+    expect(getBrowserReady()).toBe(true);
+  });
+
+  it('keeps browserReady=false and rethrows when withLoggedInPage fails', async () => {
+    _resetForTests();
+    const c = await initCrawler({ siteKey: 'school-bbs' });
+    (c.withLoggedInPage as any).mockRejectedValueOnce(new Error('login required'));
+    await expect(warmUpBrowser('school-bbs')).rejects.toThrow();
+    expect(getBrowserReady()).toBe(false);
+  });
+
+  it('keeps browserReady=false when adapter.isLoggedIn returns false', async () => {
+    _resetForTests();
+    await initCrawler({ siteKey: 'school-bbs' });
+    const { getAdapter } = await import('bbs-crawler');
+    (getAdapter as any).mockReturnValueOnce({ isLoggedIn: vi.fn(async () => false) });
+    await expect(warmUpBrowser('school-bbs')).rejects.toThrow();
+    expect(getBrowserReady()).toBe(false);
+  });
+
+  it('_resetForTests resets browserReady to false', async () => {
+    _resetForTests();
+    await initCrawler({ siteKey: 'school-bbs' });
+    await warmUpBrowser('school-bbs');
+    expect(getBrowserReady()).toBe(true);
+    _resetForTests();
+    expect(getBrowserReady()).toBe(false);
   });
 });
