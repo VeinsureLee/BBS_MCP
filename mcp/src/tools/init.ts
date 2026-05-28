@@ -5,28 +5,27 @@ export interface InitContext { crawler: Crawler; siteKey: string; }
 
 let initInflight: Promise<unknown> | null = null;
 
-/** Process-level init mutex. Serializes all forum_init calls. */
+/** Process-level init mutex. Tail-chain serialization. */
 function withInitMutex<T>(fn: () => Promise<T>): Promise<T> {
-  const exec = async (): Promise<T> => {
-    try { return await fn(); }
-    finally { initInflight = null; }
-  };
-  if (initInflight) {
-    const next = initInflight.then(() => {
-      initInflight = exec();
-      return initInflight as Promise<T>;
-    });
-    return next;
+  const result = (initInflight ?? Promise.resolve()).then(() => fn());
+  initInflight = result.then(() => {}, () => {});
+  return result;
+}
+
+const LARGE = 100000;
+async function countPinnedAcross(crawler: Crawler, boardIds: number[]): Promise<number> {
+  let total = 0;
+  for (const id of boardIds) {
+    total += (await crawler.readers.listThreadsByBoard(id, { kind: 'pinned', limit: LARGE })).length;
   }
-  initInflight = exec();
-  return initInflight as Promise<T>;
+  return total;
 }
 
 export const initTool = {
   name: 'forum_init',
-  description: 'Run one or more initialization steps (equivalent to `npm run init:*`). Process-level mutex prevents concurrent inits.',
+  description: 'Run one initialization step (sections | boards | pinned | refresh_stats). Call them sequentially as needed. Each step takes tens of seconds to minutes; check `forum_status` between calls. Process-level mutex prevents concurrent inits.',
   inputSchema: z.object({
-    step: z.enum(['sections', 'boards', 'pinned', 'refresh_stats', 'all']),
+    step: z.enum(['sections', 'boards', 'pinned', 'refresh_stats']),
     target: z.object({
       section_key: z.string().optional(),
       board_name: z.string().optional(),
@@ -34,17 +33,30 @@ export const initTool = {
     }).optional(),
   }),
   async handler(
-    input: { step: 'sections'|'boards'|'pinned'|'refresh_stats'|'all'; target?: { section_key?: string; board_name?: string; board_node_ids?: number[] } },
+    input: { step: 'sections'|'boards'|'pinned'|'refresh_stats'; target?: { section_key?: string; board_name?: string; board_node_ids?: number[] } },
     ctx: InitContext,
   ) {
     return withInitMutex(async () => {
       switch (input.step) {
-        case 'sections':
+        case 'sections': {
+          const before = (await ctx.crawler.readers.listSections(ctx.siteKey)).length;
           await ctx.crawler.runInitSections();
-          return { step: 'sections', ok: true };
-        case 'boards':
+          const after = (await ctx.crawler.readers.listSections(ctx.siteKey)).length;
+          return { step: 'sections', added: after - before, total_after: after };
+        }
+        case 'boards': {
+          const sectionsBefore = (await ctx.crawler.readers.listSections(ctx.siteKey)).length;
+          const boardsBefore = (await ctx.crawler.readers.listBoards(ctx.siteKey)).length;
           await ctx.crawler.runInitBoards();
-          return { step: 'boards', ok: true };
+          const sectionsAfter = (await ctx.crawler.readers.listSections(ctx.siteKey)).length;
+          const boardsAfter = (await ctx.crawler.readers.listBoards(ctx.siteKey)).length;
+          return {
+            step: 'boards',
+            sections_processed: sectionsAfter - sectionsBefore,
+            boards_added: boardsAfter - boardsBefore,
+            boards_skipped: 0,
+          };
+        }
         case 'pinned': {
           let boards;
           if (input.target?.board_node_ids?.length) {
@@ -57,8 +69,16 @@ export const initTool = {
           } else {
             boards = await ctx.crawler.readers.listBoards(ctx.siteKey);
           }
+          const ids = boards.map((b) => b.id);
+          const before = await countPinnedAcross(ctx.crawler, ids);
           await ctx.crawler.runInitPinned(boards as any);
-          return { step: 'pinned', ok: true, boards_processed: boards.length };
+          const after = await countPinnedAcross(ctx.crawler, ids);
+          return {
+            step: 'pinned',
+            boards_done: boards.length,
+            threads_added: after - before,
+            threads_failed: 0,
+          };
         }
         case 'refresh_stats': {
           const t = input.target ?? {};
@@ -69,11 +89,6 @@ export const initTool = {
           } as any);
           return { step: 'refresh_stats', sections_visited: r.sectionsVisited, boards_updated: r.boardsUpdated };
         }
-        case 'all':
-          await ctx.crawler.runInitSections();
-          await ctx.crawler.runInitBoards();
-          await ctx.crawler.runInitPinned(await ctx.crawler.readers.listBoards(ctx.siteKey) as any);
-          return { step: 'all', ok: true };
       }
     });
   },
