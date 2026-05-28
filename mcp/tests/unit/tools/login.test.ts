@@ -98,6 +98,23 @@ describe('loginTool', () => {
     expect(maxInFlight).toBe(1);
   });
 
+  it('serializes 3+ concurrent calls (maxInFlight stays 1)', async () => {
+    const ctx = mockCtx({ stateMtime: Date.now() });
+    let inFlight = 0; let maxInFlight = 0;
+    (ctx.crawler.withLoggedInPage as any).mockImplementation(async (fn: any) => {
+      inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 20));
+      inFlight--;
+      return fn({} as any);
+    });
+    await Promise.all([
+      loginTool.handler({}, ctx),
+      loginTool.handler({}, ctx),
+      loginTool.handler({}, ctx),
+    ]);
+    expect(maxInFlight).toBe(1);
+  });
+
   it('username is null when SCHOOL_BBS_USERNAME unset', async () => {
     const ctx = mockCtx({ stateMtime: Date.now() });
     delete process.env.SCHOOL_BBS_USERNAME;

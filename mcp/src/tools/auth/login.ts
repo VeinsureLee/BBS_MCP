@@ -7,21 +7,18 @@ export interface LoginContext { crawler: Crawler; siteKey: string; }
 
 let loginInflight: Promise<unknown> | null = null;
 
-/** Process-level login mutex. Serializes all forum_login calls. */
+/**
+ * Process-level login mutex. Serializes all forum_login calls.
+ *
+ * Implementation: tail-chain. `loginInflight` is updated synchronously to the
+ * tail of the chain BEFORE returning, so every subsequent caller observes the
+ * latest tail (not a stale earlier one) and queues after it. Errors are
+ * swallowed in the tail tracker so a rejection doesn't poison later callers.
+ */
 function withLoginMutex<T>(fn: () => Promise<T>): Promise<T> {
-  const exec = async (): Promise<T> => {
-    try { return await fn(); }
-    finally { loginInflight = null; }
-  };
-  if (loginInflight) {
-    const next = loginInflight.then(() => {
-      loginInflight = exec();
-      return loginInflight as Promise<T>;
-    });
-    return next;
-  }
-  loginInflight = exec();
-  return loginInflight as Promise<T>;
+  const result = (loginInflight ?? Promise.resolve()).then(() => fn());
+  loginInflight = result.then(() => {}, () => {});
+  return result;
 }
 
 async function readStateMtime(siteKey: string): Promise<number | null> {
