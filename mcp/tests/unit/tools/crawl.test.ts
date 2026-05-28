@@ -9,10 +9,13 @@ function mkLocks() {
 
 describe('crawlBoardTool', () => {
   it('looks up board name then calls listThreadsByName in incremental mode', async () => {
-    const list = vi.fn(async () => ({ threads: [{ id: 1 }, { id: 2 }], nextCursor: null, state: {} as any }));
+    const list = vi.fn(async () => ({ threads: [{ id: 1, url: 'existing-1' }, { id: 2, url: 'new-1' }], nextCursor: null, state: {} as any }));
     const ctx: any = {
       crawler: {
-        readers: { getBoardById: async () => ({ id: 7, siteKey: 'school-bbs', boardKey: 'B', name: '版面1' }) },
+        readers: {
+          getBoardById: async () => ({ id: 7, siteKey: 'school-bbs', boardKey: 'B', name: '版面1' }),
+          listThreadsByBoard: async () => [{ url: 'existing-1' } as any],
+        },
         service: { listThreadsByName: list },
       },
       locks: mkLocks(),
@@ -21,12 +24,13 @@ describe('crawlBoardTool', () => {
     const out = await crawlBoardTool.handler({ board_node_id: 7, mode: 'recent' }, ctx);
     expect(list).toHaveBeenCalledWith({ siteKey: 'school-bbs', boardName: '版面1', mode: 'incremental', pages: undefined });
     expect(out.threads_seen).toBe(2);
+    expect(out.threads_new).toBe(1);  // only 'new-1' is new
   });
 
   it('uses pages mode when mode=deep with max_pages', async () => {
     const list = vi.fn(async () => ({ threads: [], nextCursor: null, state: {} as any }));
     const ctx: any = {
-      crawler: { readers: { getBoardById: async () => ({ name: 'B', id: 1, siteKey: 's', boardKey: 'B' }) }, service: { listThreadsByName: list } },
+      crawler: { readers: { getBoardById: async () => ({ name: 'B', id: 1, siteKey: 's', boardKey: 'B' }), listThreadsByBoard: async () => [] }, service: { listThreadsByName: list } },
       locks: mkLocks(),
       siteKey: 's',
     };
@@ -47,7 +51,7 @@ describe('crawlBoardTool', () => {
     const list = vi.fn(async () => ({ threads: [], nextCursor: null, state: {} as any }));
     const locks = mkLocks();
     const ctx: any = {
-      crawler: { readers: { getBoardById: async () => ({ name: 'B', id: 1, siteKey: 's', boardKey: 'B' }) }, service: { listThreadsByName: list } },
+      crawler: { readers: { getBoardById: async () => ({ name: 'B', id: 1, siteKey: 's', boardKey: 'B' }), listThreadsByBoard: async () => [] }, service: { listThreadsByName: list } },
       locks,
       siteKey: 's',
     };

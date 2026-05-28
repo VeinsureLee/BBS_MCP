@@ -20,15 +20,21 @@ export const crawlBoardTool = {
     if (!board) throw new Error(`board ${input.board_node_id} not found`);
     return ctx.locks.runForBoard(input.board_node_id, async () => {
       const startedAt = Date.now();
+      // Snapshot urls before crawl so we can report a true delta.
+      const before = new Set<string>();
+      for (const t of await ctx.crawler.readers.listThreadsByBoard(input.board_node_id, { kind: 'all', limit: 100000 })) {
+        before.add(t.url);
+      }
       const r = await ctx.crawler.service.listThreadsByName({
         siteKey: ctx.siteKey,
         boardName: board.name,
         mode: input.mode === 'recent' ? 'incremental' : 'pages',
         pages: input.mode === 'deep' ? (input.max_pages ?? 3) : undefined,
       });
+      const threads_new = r.threads.filter((t) => !before.has(t.url)).length;
       return {
         threads_seen: r.threads.length,
-        threads_new: r.threads.length,
+        threads_new,
         elapsed_s: Math.round((Date.now() - startedAt) / 1000),
       };
     });

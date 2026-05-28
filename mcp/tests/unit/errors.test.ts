@@ -44,6 +44,14 @@ describe('toMcpError', () => {
     expect(err.error_code).toBe('crawler.rate_limited');
   });
 
+  it('maps DatabaseError to crawler.database', () => {
+    const err = new Error('boom');
+    (err as any).name = 'DatabaseError';
+    const m = toMcpError(err);
+    expect(m.error_code).toBe('crawler.database');
+    expect(m.message).toBe('boom');
+  });
+
   it('falls back to mcp.internal for unknown errors', () => {
     const err = toMcpError(new Error('something'));
     expect(err.error_code).toBe('mcp.internal');

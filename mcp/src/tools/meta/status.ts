@@ -24,6 +24,10 @@ export const statusTool = {
     const boards = await readers.listBoards(siteKey);
     let threads_pinned = 0;
     let threads_plain = 0;
+    // TODO(perf): once crawler.readers has a `countThreadsByBoard(boardId, kind?)`
+    // helper, replace this loop with O(boards) SELECT COUNT(*) queries instead
+    // of fetching rows just to take .length. For a single-site forum with ~30
+    // boards this is acceptable; for >100 boards consider the optimization.
     for (const b of boards) {
       if (!b.dbPath) continue;
       threads_pinned += (await readers.listThreadsByBoard(b.id, { kind: 'pinned', limit: LARGE })).length;
