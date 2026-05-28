@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Crawler } from 'bbs-crawler';
+import { getBrowserReady } from '../../runtime/crawler.js';
 
 export interface StatusContext {
   crawler: Crawler;
@@ -51,6 +52,7 @@ export const statusTool = {
         threads_plain,
       },
       logged_in,
+      browser_ready: getBrowserReady(),
       session_expires_at: null as string | null,
       last_crawled_at: null as string | null,
       graph_enabled: ctx.graphEnabled,

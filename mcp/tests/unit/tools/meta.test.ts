@@ -50,8 +50,21 @@ describe('statusTool', () => {
     expect(out.graph_enabled).toBe(false);
     expect(out.version).toBe('1.0.0');
     expect(out.logged_in).toBe(true);
+    expect(out.browser_ready).toBe(false);  // initial state from getBrowserReady()
     expect(out.session_expires_at).toBeNull();
     expect(out.last_crawled_at).toBeNull();
+  });
+
+  it('reflects getBrowserReady() return value', async () => {
+    const out = await statusTool.handler({}, {
+      crawler: mockCrawler(),
+      graphEnabled: false,
+      version: '1.0.0',
+      startedAt: Date.now(),
+      siteKey: 's',
+    });
+    expect('browser_ready' in out).toBe(true);
+    expect(typeof out.browser_ready).toBe('boolean');
   });
 
   it('logged_in falls back to false when withLoggedInPage throws', async () => {
